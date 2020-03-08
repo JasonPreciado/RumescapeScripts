@@ -1,0 +1,137 @@
+﻿using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.XR.ARFoundation;
+using UnityEngine.Experimental.XR;
+using System;
+
+public class HoldItem : MonoBehaviour
+{
+    
+    
+    public Transform destinationTransform;
+    public Material newMaterial;
+    public float dist;
+
+    Camera cam;
+    Rigidbody rb;
+    private Transform originalParent;
+    private bool beingHeld = false;
+    Renderer m_Renderer;
+    Material temp;
+    private float radius = 1f;
+
+    private float tweenDuration = 0.1f;
+    private Vector3 pickupStartPosition, pickupEndPosition;
+    private float pickupStartTime, pickupEndTime;
+    public bool animatePickUp = false;
+    private GameObject heldItem;
+
+    private int collision = 0;
+
+    void Start()
+    {
+        originalParent = transform.parent;
+        m_Renderer = GetComponent<MeshRenderer>();
+        temp = m_Renderer.material;
+        cam = GameObject.FindGameObjectWithTag("MainCamera").GetComponent<PlayerController>().cam;
+    }
+
+
+    void Update()
+    {
+        dist = Vector3.Distance(cam.transform.position, transform.position);
+        TriggerOutline();
+
+        if(beingHeld)
+        {
+            rb.velocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
+
+
+        if (animatePickUp == true)
+        { // We should tween now
+            if (Time.time < pickupEndTime)
+            {
+                float lerp = Mathf.InverseLerp(pickupStartTime, pickupEndTime, Time.time);    // Calculate lerp value
+                heldItem.transform.localPosition = Vector3.Lerp(pickupStartPosition, pickupEndPosition, lerp); // Do the tween
+            }
+            else
+            {
+                // Done tweening, end
+                animatePickUp = false;
+            
+            }
+        }
+    }
+
+    public void ItemInteraction(GameObject item)
+    { 
+
+        if (!beingHeld && dist <= radius)
+        {
+            heldItem = item;
+            rb = heldItem.GetComponent<Rigidbody>();
+            //item.transform.position = destinationTransform.position;
+            heldItem.transform.parent = destinationTransform;
+            //rb.isKinematic = true;
+            rb.useGravity = false;
+            rb.detectCollisions = true;
+           
+            beingHeld = true;
+            animatePickUp = true;
+            pickupStartTime = Time.time;                         // Store when we start
+            pickupEndTime = Time.time + tweenDuration;
+
+            pickupStartPosition = item.transform.localPosition;  // Store where we start
+            pickupEndPosition = new Vector3(0, 0, 0);
+        }
+        else if (beingHeld)
+        {
+            //rb.isKinematic = false;
+            rb.useGravity = true;
+            heldItem.transform.parent = originalParent;
+            beingHeld = false;
+        }  
+    }
+
+    public void throwItem(GameObject item)
+    {
+        //rb.isKinematic = false;
+        rb.useGravity = true;
+        rb.AddForce(destinationTransform.forward * 5, ForceMode.Impulse);
+        rb.AddForce(destinationTransform.up * 2, ForceMode.Impulse);
+        heldItem.transform.parent = originalParent;
+        beingHeld = false;
+    }
+
+    void TriggerOutline()
+    {
+        if (dist <= radius && !beingHeld)
+        {
+            m_Renderer.material = newMaterial;
+        }
+        else
+        {
+            m_Renderer.material = temp;
+        }
+    }
+    void OnCollisionEnter()
+    {
+        if(beingHeld)
+        {
+            collision++;
+            Debug.Log("Collisions:" + collision);
+        }
+    }
+    void OnCollisionExit()
+    {
+        if (beingHeld)
+        {
+            heldItem.transform.localPosition = new Vector3(0, 0, 0);
+        }
+    }
+
+
+}
